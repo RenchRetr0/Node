@@ -8,11 +8,6 @@ import sequelize from '../database/sequelize';
 import {Sequelize} from 'sequelize-typescript';
 dotenv.config();
 
-interface GenericResponse {
-    status: number,
-    message: string;
-}
-
 export default class AuthApi {
     sequelize: Sequelize;
 
@@ -83,9 +78,7 @@ export default class AuthApi {
                 message: 'User was successfully created.'
             };
         } catch (e) {
-            console.log(e);
             throw e;
-            // return reply.code(500).send(e);
         }
     }
 
@@ -149,11 +142,70 @@ export default class AuthApi {
             });
 
             return {
+                user,
                 status: 200,
                 message: 'OK',
-                user,
                 token
             };
+        } catch (e) {
+            throw e;
+        }
+    }
+
+    public async validateJwt(options: {
+        token: string
+    }) {
+        try {
+            const {token} = options;
+
+            if (!token) {
+                throw new CustomError({
+                    status: 400,
+                    message: 'All parameters are required.'
+                });
+            }
+            if (!options) {
+                throw new CustomError({
+                    status: 400,
+                    message: 'Parameters is required.'
+                });
+            }
+
+            const verify = await jwt.verify(token, process.env.TOKEN_SECRET);
+
+            if (typeof verify === 'string') {
+                throw new CustomError({
+                    status: 500,
+                    message: 'Internal server error'
+                });
+            }
+
+            if (!verify) {
+                throw new CustomError({
+                    status: 401,
+                    message: 'Unauthorized.'
+                });
+            }
+
+            const user = await User.findByPk(verify.data.id, {
+                attributes: ['email'],
+            });
+
+            if (!user) {
+                throw new CustomError({
+                    status: 404,
+                    message: 'User does not exist.'
+                });
+            }
+
+            return {
+                verify: {
+                    user,
+                },
+                status: 200,
+                message: 'OK',
+            };
+
         } catch (e) {
             throw e;
         }
